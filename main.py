@@ -3,9 +3,12 @@ import pandas as pd
 
 # Read the data from the Excel file
 dfprods = pd.read_excel("D:/Work/SIMP/product_list_spreadsheet.xlsx")
-dfentries = pd.read_excel("D:/Work/SIMP/entries_spreadsheet.xlsx")
+dfentries = pd.read_excel("D:/Work/SIMP/entries_spreadsheet_2018.xlsx")
 FIFO = {}
 errors = []
+quantities = {}
+zero_values = []
+
 # Connect to the database
 username = "root"
 password = "13579111315szxM"
@@ -13,10 +16,11 @@ engine = create_engine(
     f"mysql+mysqlconnector://{username}:{password}@127.0.0.1/store_evaluator_schema"
 )
 dfprods.to_sql(name="product_list", con=engine, if_exists="replace", index=False)
+dfentries.to_sql(name="entries", con=engine, if_exists="replace", index=False)
 c = engine.connect()
 
 
-def enqueue(product_code, quantity, price):
+def enqueue(product_code, quantity, price, permission_number):
     # Add the product to the queue
     FIFO[product_code].append([quantity, price])
 
@@ -30,7 +34,6 @@ def dequeue(product_code, quantity, permission_number, year):
         return 1
     for i in range(len(FIFO[product_code])):
         total_quantity += FIFO[product_code][i][0]
-    print("Total quantity is: " + str(total_quantity))
     # If the total quantity is less than the quantity requested, add the permission number to the errors list to be fixed manually later
     if total_quantity < quantity:
         errors.append([year, permission_number, product_code])
@@ -54,6 +57,7 @@ for i in range(len(dfprods)):
     FIFO[product_code] = []
 
 
+
 # Go over each entry, if the entry is incoming, enqueue the product, if it is outgoing, dequeue the product
 for i in range(len(dfentries)):
     year = dfentries.iloc[i, 0]
@@ -63,17 +67,50 @@ for i in range(len(dfentries)):
     incoming = dfentries.iloc[i, 4]
     unit_price = dfentries.iloc[i, 5]
     outgoing = dfentries.iloc[i, 6]
+    if i == 0:
+        continue
     if int(incoming) > 0:
-        enqueue(product_code, incoming, unit_price)
-    else:
+        enqueue(product_code, incoming, unit_price, permission_number)
+    elif int(outgoing) > 0:
         dequeue(product_code, outgoing, permission_number, year)
+    
 
-# Print the full list of errors
-print(errors)
 
-# Count the number of error per year
-sum = 0
-for i in range(len(errors)):
-     sum += 1
-print("Number of errors is: " + str(sum))
+# Create a Dictionary where the key is the product code and the value is the total quantity of the product in the store
+for i in range(len(dfprods)):
+    product_code = dfprods.iloc[i, 0]
+    product_name = dfprods.iloc[i, 1]
+    quantities[product_code] = 0
+    if len(FIFO[product_code]) > 0:
+        for j in range(len(FIFO[product_code])):
+                quantities[product_code] += FIFO[product_code][j][0]
 
+# Check test case for products entered with zero unit price
+                
+""" for i in range(len(dfentries)):
+    year = dfentries.iloc[i, 0]
+    permission_number = dfentries.iloc[i, 1]
+    product_code = dfentries.iloc[i, 2]
+    product_name = dfentries.iloc[i, 3]
+    incoming = dfentries.iloc[i, 4]
+    unit_price = dfentries.iloc[i, 5]
+    outgoing = dfentries.iloc[i, 6]
+    if i == 0:
+        continue
+    if incoming > 0 and unit_price == 0 and quantities[product_code] != 0 and year > 2017 and product_code < 5063:
+        zero_values.append(product_code)
+set_of_zeros = set(zero_values) """
+
+# Extract results
+
+# Iterate over each product in the dictionary. For each product, pass over the queue and calculate the total value of the product by multiplying the quantity by the price and adding it to the total value of the store
+store_total = 0
+for product_code in FIFO:
+    if len(FIFO[product_code]) == 0:
+        continue
+    for i in range(len(FIFO[product_code])):
+        print("Quantity: ", FIFO[product_code][i][0])
+        print("Price: ", FIFO[product_code][i][1])
+        store_total += FIFO[product_code][i][0] * FIFO[product_code][i][1]
+
+print(f"{store_total:,}")
