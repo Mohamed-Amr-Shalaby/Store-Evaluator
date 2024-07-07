@@ -3,7 +3,7 @@ import pandas as pd
 
 # Read the data from the Excel file
 dfprods = pd.read_excel("D:/Work/SIMP/product_list_spreadsheet.xlsx")
-dfentries = pd.read_excel("D:/Work/SIMP/entries_spreadsheet_2018.xlsx")
+dfentries = pd.read_excel("D:/Work/SIMP/entries_spreadsheet_2023.xlsx")
 FIFO = {}
 errors = []
 quantities = {}
